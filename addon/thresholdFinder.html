@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<input type="file" id="myFile">Load image</input>
+<br>
+<button id="download" type="button">Download!</button>
+<br>
+<input id="threshold" placeholder="threshold">
+<br>
+<button id="findThreshold" type="button">Threshold!</button>
+<br>
+<table>
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th width="150">Hovered color</th>
+            <th width="150">Hovered value</th>
+            <th width="150">Selected area</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <canvas id="myCanvas"></canvas>
+            </td>
+            <td align="center" class="color-cell" id="hovered-color"></td>
+            <td align="center" class="color-cell" id="hovered-value"></td>
+            <td align="center" class="color-cell" id="selected-area"></td>
+        </tr>
+    </tbody>
+</table>
+
+<script>
+let originalImageData
+let imageWidth
+let imageHeight
+let channel
+let filename
+let xStart
+let xFinish
+let yStart
+let yFinish
+let setArea = false
+
+document.getElementById("findThreshold").onclick = function findThreshold() {
+    // can be defined as function getUnStrokeImageData
+    let ctx = document.getElementById("myCanvas").getContext("2d")
+    ctx.putImageData(originalImageData, 0, 0)
+    let imageData = ctx.getImageData(xStart, yStart, xFinish-xStart, yFinish-yStart).data
+    ctx.strokeStyle = "red"
+    ctx.strokeRect(xStart, yStart, xFinish-xStart, yFinish-yStart)
+
+    let channelData = []
+    let channelDataStr = []
+    imageData.forEach((x, index) => { if (index % channel === 0) { channelData.push(x) } })
+    while (channelData.length) {
+        channelDataStr.push(channelData.splice(0, xFinish-xStart))
+    }
+
+    const threshold = Number(document.getElementById("threshold").value)
+
+    const beginThreshold = channelDataStr.map(x => x.map(y => y < threshold).indexOf(true))
+    const endThreshold = channelDataStr.map(x => x.map(y => y < threshold).lastIndexOf(true))
+    channelDataStr = channelDataStr.map((x, index) => { 
+        x.splice(beginThreshold[index], endThreshold[index] - beginThreshold[index] + 1, ...[...Array(endThreshold[index] - beginThreshold[index] + 1)].map(x=>"TiN")) 
+        return x
+    })
+    channelDataStr = "data:text/csv;charset=utf-8," + channelDataStr.map(x => x.join(",")).join("\n")    
+    clickDownload(channelDataStr, filename)
+}
+
+document.getElementById("download").onclick = function () {
+    let ctx = document.getElementById("myCanvas").getContext("2d")
+    ctx.putImageData(originalImageData, 0, 0)
+    let imageData = ctx.getImageData(xStart, yStart, xFinish-xStart, yFinish-yStart).data
+    ctx.strokeStyle = "red"
+    ctx.strokeRect(xStart, yStart, xFinish-xStart, yFinish-yStart)
+
+    let channelData = []
+    let channelDataStr = []
+    imageData.forEach((x, index) => { if (index % channel === 0) { channelData.push(x) } })
+    while (channelData.length) {
+        channelDataStr.push(channelData.splice(0, xFinish-xStart))
+    }
+    channelDataStr = "data:text/csv;charset=utf-8," + channelDataStr.map(x => x.join(",")).join("\n")
+    clickDownload(channelDataStr, filename)
+}
+
+document.getElementById('myFile').onchange = function (evt) {
+    let tgt = evt.target || evt.srcElement
+    let files = tgt.files
+    filename = files[0].name
+    // files[0].type.indexOf('image') !== -1
+    if (FileReader && files && files.length) {
+        let fr = new FileReader()
+        fr.readAsDataURL(files[0])
+        fr.onload = function (evt) {
+            let img = new Image()
+            img.src = evt.target.result
+            img.onload = function () {
+                imagetoCanvas(this)
+            }
+        }
+    }
+}
+
+document.getElementById("myCanvas").addEventListener('mousemove', function(event) {
+    pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
+})
+
+document.getElementById("myCanvas").addEventListener('mousedown', function(event) {
+    setStart(event, document.getElementById('selected-area'));
+})
+
+function clickDownload(csvContent, fn) {
+    let encodedUri = encodeURI(csvContent);
+    let link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", fn + ".csv")
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+}
+
+function imagetoCanvas(img) {
+    let canvas = document.getElementById("myCanvas")
+    let ctx = canvas.getContext("2d")
+    imageWidth = img.width
+    imageHeight = img.height
+    canvas.width = imageWidth
+    canvas.height = imageHeight
+    ctx.drawImage(img, 0, 0)
+    xStart = 0
+    yStart = 0
+    xFinish = imageWidth
+    yFinish = imageHeight
+    originalImageData = ctx.getImageData(0, 0, imageWidth, imageHeight)
+    let imageData = originalImageData.data
+    channel = imageData.length / imageWidth / imageHeight
+}
+
+function pick(event, colorCol, valueCol) {
+    let ctx = document.getElementById("myCanvas").getContext("2d")
+    let x = event.offsetX
+    let y = event.offsetY
+    let pixel = ctx.getImageData(x, y, 1, 1)
+    let data = pixel.data
+
+    const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
+    colorCol.style.background = rgba
+    valueCol.textContent = `value=${data[0]}, x=${x}, y=${y}`
+
+    return rgba
+}
+
+function setStart(event, areaCol) {
+    let ctx = document.getElementById("myCanvas").getContext("2d")
+    ctx.strokeStyle = "red"
+    if (setArea) {
+        xFinish = event.offsetX
+        yFinish = event.offsetY
+        ctx.strokeRect(xStart, yStart, xFinish-xStart, yFinish-yStart)
+        setArea = false
+    } else {
+        xStart = event.offsetX
+        yStart = event.offsetY
+        ctx.putImageData(originalImageData, 0, 0)
+        setArea = true
+    }
+    areaCol.textContent = `selected area = (${xStart}, ${yStart}, ${xFinish}, ${yFinish})`
+}
+
+</script>
