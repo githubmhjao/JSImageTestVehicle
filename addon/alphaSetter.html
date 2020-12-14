@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<input type="file" id="myFile">Load image</input>
+<br>
+<button id="download" type="button">Download!</button>
+<br>
+
+<table>
+    <thead>
+        <tr>
+            <th>Set</th>
+            <th>Value = </th>
+            <th>below</th>
+            <th>As Alpha = </th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th></th>
+            <th><input id="valueThreshold" placeholder="Threshold"></th>
+            <th></th>
+            <th><input id="valueAlpha" placeholder="Alpha"></th>
+        </tr>
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th width="150">Hovered color</th>
+            <th width="150">Hovered value</th>
+            <th width="150">Selected area</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <canvas id="myCanvas"></canvas>
+            </td>
+            <td align="center" class="color-cell" id="hovered-color"></td>
+            <td align="center" class="color-cell" id="hovered-value"></td>
+            <td align="center" class="color-cell" id="selected-area"></td>
+        </tr>
+    </tbody>
+</table>
+
+<script>
+let originalImageData
+let filename
+let threshold = 0
+let alpha = 255
+
+document.getElementById('valueThreshold').onchange = function(evt) {
+    threshold = Number(evt.target.value)
+    updateAlpha(threshold, alpha)
+}
+
+document.getElementById('valueAlpha').onchange = function(evt) {
+    alpha = Number(evt.target.value)
+    updateAlpha(threshold, alpha)
+}
+
+document.getElementById("download").onclick = function () {
+    clickDownload(filename, threshold, alpha)
+}
+
+document.getElementById('myFile').onchange = function (evt) {
+    let tgt = evt.target || evt.srcElement
+    let files = tgt.files
+    filename = files[0].name
+    // files[0].type.indexOf('image') !== -1
+    if (FileReader && files && files.length) {
+        let fr = new FileReader()
+        fr.readAsDataURL(files[0])
+        fr.onload = function (evt) {
+            let img = new Image()
+            img.src = evt.target.result
+            img.onload = function () {
+                imagetoCanvas(this)
+            }
+        }
+    }
+}
+
+document.getElementById("myCanvas").addEventListener('mousemove', function(event) {
+    pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'))
+})
+
+function clickDownload(fn, th, al) {
+    let canvas = document.getElementById('myCanvas')
+    let link = document.createElement("a")
+    link.setAttribute("href", canvas.toDataURL())
+    link.setAttribute("download", `${fn}_${th}_${al}.png`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+}
+
+function imagetoCanvas(img) {
+    let canvas = document.getElementById("myCanvas")
+    let ctx = canvas.getContext("2d")
+    let imageWidth = img.width
+    let imageHeight = img.height
+    canvas.width = imageWidth
+    canvas.height = imageHeight
+    ctx.drawImage(img, 0, 0)
+    xStart = 0
+    yStart = 0
+    xFinish = imageWidth
+    yFinish = imageHeight
+    threshold = 0
+    alpha = 255
+    document.getElementById('valueThreshold').value = threshold
+    document.getElementById('valueAlpha').value = alpha
+    originalImageData = ctx.getImageData(0, 0, imageWidth, imageHeight)
+}
+
+function pick(event, colorCol, valueCol) {
+    let ctx = document.getElementById("myCanvas").getContext("2d")
+    let x = event.offsetX
+    let y = event.offsetY
+    let pixel = ctx.getImageData(x, y, 1, 1)
+    let data = pixel.data
+
+    const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
+    colorCol.style.background = rgba
+    valueCol.textContent = `value=${data[0]}, x=${x}, y=${y}`
+
+    return rgba
+}
+
+function updateAlpha(threshold, alpha) {
+    let canvas = document.getElementById('myCanvas')
+    let ctx = canvas.getContext('2d')
+
+    let imageWidth = canvas.width
+    let imageHeight = canvas.height
+    let channel = 4
+    let imageData = [...originalImageData.data]
+    imageData = imageData.map((x, i, a) => { if (i % channel == 3 && a[i-3] < threshold) { return alpha } else { return x } })
+    buffer = new Uint8ClampedArray(imageData)
+    let bufferImageData = ctx.createImageData(imageWidth, imageHeight)
+    bufferImageData.data.set(buffer)
+    ctx.putImageData(bufferImageData, 0, 0)
+}
+</script>
