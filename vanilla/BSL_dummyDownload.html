@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <input type="file" id="myFile">Load image</input>
 <br>
-<button id="download" type="button">Download!</button>
+<button id="myDownload" type="button">Download!</button>
 <br>
 <canvas id="myCanvas"></canvas>
  
 
 <script>
-let imageWidth
-let imageHeight
-let filename
+const myFile = document.getElementById("myFile")
+const myDnLd = document.getElementById("myDownload")
+const myCanv = document.getElementById("myCanvas")
 
-document.getElementById("download").onclick = function () {
-    let ctx = document.getElementById("myCanvas").getContext("2d")
-    let imageData = ctx.getImageData(0, 0, imageWidth, imageHeight).data
-    let channel = imageData.length / imageWidth / imageHeight
+myDnLd.onclick = function () {
+    const ctx = myCanv.getContext("2d")
+    const imageWidth = myCanv.width
+    const imageHeight = myCanv.height
+    const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight).data
+    const channel = imageData.length / imageWidth / imageHeight
+    const filename = myFile.files[0].name
 
     let channelData = []
     let channelDataStr = []
@@ -26,10 +29,9 @@ document.getElementById("download").onclick = function () {
     dummyDownload(channelDataStr, filename)
 }
 
-document.getElementById('myFile').onchange = function (evt) {
+myFile.onchange = function (evt) {
     let tgt = evt.target || evt.srcElement
     let files = tgt.files
-    filename = files[0].name
     // files[0].type.indexOf('image') !== -1
     if (FileReader && files && files.length) {
         let fr = new FileReader()
@@ -56,13 +58,9 @@ function dummyDownload(csvContent, fn) {
 }
 
 function imagetoCanvas(img) {
-    let canvas = document.getElementById("myCanvas")
-    let ctx = canvas.getContext("2d")
-    imageWidth = img.width
-    imageHeight = img.height
-    canvas.width = imageWidth
-    canvas.height = imageHeight
+    const ctx = myCanv.getContext("2d")
+    myCanv.width = img.width
+    myCanv.height = img.height
     ctx.drawImage(img, 0, 0)
-    imageData = ctx.getImageData(0, 0, imageWidth, imageHeight)
 }
 </script>
