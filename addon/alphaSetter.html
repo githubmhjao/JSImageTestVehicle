@@ -1,24 +1,35 @@
 <!DOCTYPE html>
-<input type="file" id="myFile">Load image</input>
-<br>
-<button id="download" type="button">Download!</button>
-<br>
+<table>
+    <tr>
+        <th><input type="file" id="myFile"></th>
+        <th><button id="myDownload" type="button">Download!</button></th>
+    </tr>
+</table>    
 
 <table>
     <thead>
         <tr>
             <th>Set</th>
+            <th>Channel = </th>
             <th>Value = </th>
-            <th>below</th>
+            <th>Below/Above</th>
             <th>As Alpha = </th>
         </tr>
     </thead>
     <tbody>
         <tr>
             <th></th>
-            <th><input id="valueThreshold" placeholder="Threshold"></th>
-            <th></th>
-            <th><input id="valueAlpha" placeholder="Alpha"></th>
+            <th><select id="myChannel">
+                <option value="0">Red</option>
+                <option value="1">Green</option>
+                <option value="2">Blue</option>
+            </select></th>
+            <th><input id="myThreshold" placeholder="Threshold"></th>
+            <th><select id="myCriteria">
+                <option value="below">Below</option>
+                <option value="above">Above</option>
+            </select></th>
+            <th><input id="myAlpha" placeholder="Alpha"></th>
         </tr>
     </tbody>
 </table>
@@ -45,79 +56,109 @@
 </table>
 
 <script>
-let originalImageData
-let filename
-let threshold = 0
-let alpha = 255
+// Async/Await version
+const myFile = document.getElementById("myFile")
+const myDnLd = document.getElementById("myDownload")
 
-document.getElementById('valueThreshold').onchange = function(evt) {
-    threshold = Number(evt.target.value)
-    updateAlpha(threshold, alpha)
+const myChnl = document.getElementById("myChannel")
+const myTshd = document.getElementById("myThreshold")
+const myCrit = document.getElementById("myCriteria")
+const myAlph = document.getElementById("myAlpha")
+
+const myCanv = document.getElementById("myCanvas")
+
+myFile.onchange = async () => { const url = await getOriginalImageData() }
+
+myChnl.onchange = async () => {
+    const url = await getOriginalImageData()
+    updateCondition(queryCondition())
 }
 
-document.getElementById('valueAlpha').onchange = function(evt) {
-    alpha = Number(evt.target.value)
-    updateAlpha(threshold, alpha)
+myTshd.onchange = async () => {
+    const url = await getOriginalImageData()
+    updateCondition(queryCondition())
 }
 
-document.getElementById("download").onclick = function () {
-    clickDownload(filename, threshold, alpha)
+myCrit.onchange = async () => {
+    const url = await getOriginalImageData()
+    updateCondition(queryCondition())
 }
 
-document.getElementById('myFile').onchange = function (evt) {
-    let tgt = evt.target || evt.srcElement
-    let files = tgt.files
-    filename = files[0].name
-    // files[0].type.indexOf('image') !== -1
-    if (FileReader && files && files.length) {
-        let fr = new FileReader()
-        fr.readAsDataURL(files[0])
-        fr.onload = function (evt) {
-            let img = new Image()
-            img.src = evt.target.result
-            img.onload = function () {
-                imagetoCanvas(this)
-            }
-        }
-    }
+myAlph.onchange = async () => {
+    const url = await getOriginalImageData()
+    updateCondition(queryCondition())
 }
 
-document.getElementById("myCanvas").addEventListener('mousemove', function(event) {
+myCanv.addEventListener('mousemove', function(event) {
     pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'))
 })
 
-function clickDownload(fn, th, al) {
-    let canvas = document.getElementById('myCanvas')
-    let link = document.createElement("a")
-    link.setAttribute("href", canvas.toDataURL())
-    link.setAttribute("download", `${fn}_${th}_${al}.png`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-
-    link.click()
+myDnLd.onclick = function () {
+    const condition = queryCondition()
+    const filename = myFile.files[0].name
+    clickDownload(filename, condition)
 }
 
-function imagetoCanvas(img) {
-    let canvas = document.getElementById("myCanvas")
-    let ctx = canvas.getContext("2d")
-    let imageWidth = img.width
-    let imageHeight = img.height
-    canvas.width = imageWidth
-    canvas.height = imageHeight
+// get original imageData
+function getOriginalImageData() {
+    return new Promise(resolve => {
+            const files = myFile.files
+            if (FileReader && files && files.length) {
+                const fr = new FileReader()
+                fr.readAsDataURL(files[0])
+                fr.onload = function(evt) {
+                    const img = new Image()
+                    img.src = evt.target.result
+                    img.onload = function() {
+                        imageToCanvas(this)
+                        return resolve(evt.target.result)
+                    }
+                }
+            }
+        }
+    )
+}
+
+function imageToCanvas(img) {
+    const ctx = myCanv.getContext("2d")
+    myCanv.width = img.width
+    myCanv.height = img.height
     ctx.drawImage(img, 0, 0)
-    xStart = 0
-    yStart = 0
-    xFinish = imageWidth
-    yFinish = imageHeight
-    threshold = 0
-    alpha = 255
-    document.getElementById('valueThreshold').value = threshold
-    document.getElementById('valueAlpha').value = alpha
-    originalImageData = ctx.getImageData(0, 0, imageWidth, imageHeight)
+}
+
+// get condition
+function queryCondition() {
+    const valueChnl = Number(myChnl.value)
+    const valueTshd = Number(myTshd.value || 0)
+    const valueCrit = myCrit.value
+    const valueAlph = Number(myAlph.value || 0)
+    return { valueChnl, valueTshd, valueCrit, valueAlph }
+}
+
+function updateCondition(condition) {
+    const { valueChnl, valueTshd, valueCrit, valueAlph } = condition
+    const ctx = myCanv.getContext('2d')
+
+    const imageWidth = myCanv.width
+    const imageHeight = myCanv.height
+    const channel = 4
+
+    let imageData = ctx.getImageData(0, 0, imageWidth, imageHeight).data
+    
+    if (valueCrit === 'below') {
+        imageData = imageData.map((x, i, a) => { if (i % channel == 3 && a[i-3+valueChnl] < valueTshd) { return valueAlph } else { return x } })
+    } else {
+        imageData = imageData.map((x, i, a) => { if (i % channel == 3 && a[i-3+valueChnl] > valueTshd) { return valueAlph } else { return x } })
+    }
+    
+    buffer = new Uint8ClampedArray(imageData)
+    let bufferImageData = ctx.createImageData(imageWidth, imageHeight)
+    bufferImageData.data.set(buffer)
+    ctx.putImageData(bufferImageData, 0, 0)
 }
 
 function pick(event, colorCol, valueCol) {
-    let ctx = document.getElementById("myCanvas").getContext("2d")
+    let ctx = myCanv.getContext("2d")
     let x = event.offsetX
     let y = event.offsetY
     let pixel = ctx.getImageData(x, y, 1, 1)
@@ -125,23 +166,18 @@ function pick(event, colorCol, valueCol) {
 
     const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
     colorCol.style.background = rgba
-    valueCol.textContent = `value=${data[0]}, x=${x}, y=${y}`
+    valueCol.textContent = `RGB=(${data[0]}, ${data[1]}, ${data[2]}) x=${x}, y=${y}`
 
     return rgba
 }
 
-function updateAlpha(threshold, alpha) {
-    let canvas = document.getElementById('myCanvas')
-    let ctx = canvas.getContext('2d')
+function clickDownload(fn, condition) {
+    let link = document.createElement("a")
+    link.setAttribute("href", myCanv.toDataURL())
+    link.setAttribute("download", `${fn}_set_Ch_${condition.valueChnl}_value_${condition.valueTshd}_${condition.valueCrit}_as_Alpha_${condition.valueAlph}.png`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
 
-    let imageWidth = canvas.width
-    let imageHeight = canvas.height
-    let channel = 4
-    let imageData = [...originalImageData.data]
-    imageData = imageData.map((x, i, a) => { if (i % channel == 3 && a[i-3] < threshold) { return alpha } else { return x } })
-    buffer = new Uint8ClampedArray(imageData)
-    let bufferImageData = ctx.createImageData(imageWidth, imageHeight)
-    bufferImageData.data.set(buffer)
-    ctx.putImageData(bufferImageData, 0, 0)
+    link.click()
 }
 </script>
