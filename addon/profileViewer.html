@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<input type="file" id="myFile">
+<table>
+    <tr>
+        <th>X Start</th>
+        <th><input id="eleXStart"></th>
+        <th>Y Start</th>
+        <th><input id="eleYStart"></th>
+    </tr>
+    <tr>
+        <th>X Finish</th>
+        <th><input id="eleXFinish"></th>
+        <th>Y Finish</th>
+        <th><input id="eleYFinish"></th>
+    </tr>
+    <tr>
+        <th>Threshold</th>
+        <th><input id="eleThreshold" placeholder="threshold"></th>
+        <th>⇓ / ⇑</th>
+        <th><select id="eleCriteria">
+            <option value="below">Below</option>
+            <option value="above">Above</option>
+        </select></th>
+    </tr>
+    <tr>
+        <th><button id="myPNG" type="button">PNG File</button></th>
+        <th><button id="myCSV" type="button">CSV File</button></th>
+    </tr>
+</table>
+<table>
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th width="150">Hovered color</th>
+            <th width="150">Hovered value</th>
+            <th width="150">Selected area</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <canvas id="myCanvas"></canvas>
+            </td>
+            <td align="center" class="color-cell" id="hovered-color"></td>
+            <td align="center" class="color-cell" id="hovered-value"></td>
+            <td align="center" class="color-cell" id="selected-area"></td>
+        </tr>
+    </tbody>
+</table>
+
+<script>
+const myFile = document.getElementById("myFile")
+const myCanv = document.getElementById("myCanvas")
+const myPNG = document.getElementById("myPNG")
+const myCSV = document.getElementById("myCSV")
+
+const eleXS = document.getElementById("eleXStart")
+const eleYS = document.getElementById("eleYStart")
+const eleXF = document.getElementById("eleXFinish")
+const eleYF = document.getElementById("eleYFinish")
+const eleTshd = document.getElementById("eleThreshold")
+const eleCrit = document.getElementById("eleCriteria")
+
+myFile.onchange = async () => { const url = await getOriginalImage() }
+
+myPNG.onclick = async () => {
+    const url = await getOriginalImage()
+    const condition = validCondition(queryCondition())
+    const profile = drawProfile(condition)
+    const filename = myFile.files[0].name
+    downloadPNG(filename, condition)  
+    drawArea(condition)  
+}
+
+myCSV.onclick = async () => {
+    const url = await getOriginalImage()
+    const condition = validCondition(queryCondition())
+    const profile = drawProfile(condition)
+    const filename = myFile.files[0].name
+    downloadCSV(filename, condition, profile)
+    drawArea(condition)
+}
+
+myCanv.addEventListener('mousemove', function(event) {
+    pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
+})
+
+eleXS.onchange = handleChange
+
+eleYS.onchange = handleChange
+
+eleXF.onchange = handleChange
+
+eleYF.onchange = handleChange
+
+eleTshd.onchange = handleChange
+
+eleCrit.onchange = handleChange
+
+// get original imageData
+function getOriginalImage() {
+    return new Promise(resolve => {
+            const files = myFile.files
+            if (FileReader && files && files.length) {
+                const fr = new FileReader()
+                fr.readAsDataURL(files[0])
+                fr.onload = function(evt) {
+                    const img = new Image()
+                    img.src = evt.target.result
+                    img.onload = function() {
+                        imageToCanvas(this)
+                        return resolve(evt.target.result)
+                    }
+                }
+            }
+        }
+    )
+}
+
+function imageToCanvas(img) {
+    const ctx = myCanv.getContext("2d")
+    myCanv.width = img.width
+    myCanv.height = img.height
+    ctx.drawImage(img, 0, 0)
+}
+
+// query condition
+function queryCondition() {
+    const XS = Number(eleXS.value || 0)
+    const YS = Number(eleYS.value || 0)
+    const XF = Number(eleXF.value || myCanv.width)
+    const YF = Number(eleYF.value || myCanv.height)
+    const Tshd = Number(eleTshd.value || 0)
+    const Crit = eleCrit.value
+
+    return { XS, YS, XF, YF, Tshd, Crit }
+}
+
+// valid condition
+function validCondition({ XS, YS, XF, YF, Tshd, Crit }) {
+    const conXS = Math.max(0, Math.min(XS, XF))
+    const conYS = Math.max(0, Math.min(YS, YF))
+    const conXF = Math.min(myCanv.width, Math.max(XS, XF))
+    const conYF = Math.min(myCanv.height, Math.max(YS, YF))
+    const conTshd = Math.max(0, Math.min(Tshd, 255))
+    const conCrit = Crit
+
+    eleXS.value = conXS
+    eleYS.value = conYS
+    eleXF.value = conXF
+    eleYF.value = conYF
+    eleTshd.value = conTshd
+
+    return { conXS, conYS, conXF, conYF, conTshd, conCrit }
+}
+
+function drawProfile(condition) {
+
+    const ctx = myCanv.getContext("2d")
+    const XS = condition.conXS
+    const YS = condition.conYS
+    const XF = condition.conXF
+    const YF = condition.conYF
+
+    const conTshd = condition.conTshd
+    const conCrit = condition.conCrit
+
+    const selectWidth = XF-XS
+    const selectHeight = YF-YS
+    const channel = 4
+    const imageData = [...ctx.getImageData(XS, YS, XF-XS, YF-YS).data]
+    const channelImageData = imageData.filter((x, i) => i % channel === 0)
+    const verticalChannelImageData = [...Array(selectWidth)].map((x, i) => channelImageData.filter((xc, ic) => ic % selectWidth === i).map((xv, iv) => [xv, iv]))
+
+    const filterCrit = conCrit === 'above'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
+
+    const profile = verticalChannelImageData.map(x => x.filter(filterCrit)[0] || x[selectHeight-1])
+
+    // begin drawing
+    ctx.beginPath()
+
+    profile.forEach((x, i) => {
+        if (i === 0) {
+            ctx.moveTo(XS + i, YS + x[1])
+        } else {
+            ctx.lineTo(XS + i, YS + x[1])
+        }
+    })
+
+    ctx.strokeStyle = "rgba(0,255,0,1)"
+    ctx.lineWidth = 4
+    ctx.stroke()
+
+    return profile
+}
+
+function drawArea(condition) {
+
+    const ctx = myCanv.getContext("2d")
+    const XS = condition.conXS
+    const YS = condition.conYS
+    const XF = condition.conXF
+    const YF = condition.conYF
+
+    ctx.strokeStyle = "red"
+    ctx.strokeRect(XS, YS, XF-XS, YF-YS)
+
+}
+
+async function handleChange() {
+    const url = await getOriginalImage()
+    const condition = validCondition(queryCondition())
+    drawProfile(condition)
+    drawArea(condition)
+}
+
+function downloadCSV(fn, condition, profile) {
+
+    const XS = condition.conXS
+    const YS = condition.conYS
+    const height = myCanv.height
+    const adjustProfile = profile.map((x, i) => [XS + i, height - YS - x[1]])
+    const csvContent = "data:text/csv;charset=utf-8," + adjustProfile.map(x => x.join(",")).join("\n")
+    const encodedUri = encodeURI(csvContent)
+
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `${fn}_[${condition.conXS}_${condition.conYS}_${condition.conXF}_${condition.conYF}]_${condition.conTshd}.csv`)
+
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+}
+
+function downloadPNG(fn, condition) {
+    const link = document.createElement("a")
+    link.setAttribute("href", myCanv.toDataURL())
+    link.setAttribute("download", `${fn}_[${condition.conXS}_${condition.conYS}_${condition.conXF}_${condition.conYF}]_${condition.conTshd}.png`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+} 
+
+function pick(event, colorCol, valueCol) {
+    const ctx = myCanv.getContext("2d")
+    const x = event.offsetX
+    const y = event.offsetY
+    const pixel = ctx.getImageData(x, y, 1, 1)
+    const data = pixel.data
+
+    const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
+    colorCol.style.background = rgba
+    valueCol.textContent = `RGB=(${data[0]}, ${data[1]}, ${data[2]}), x=${x}, y=${y}`
+
+    return rgba
+}
+
+</script>
