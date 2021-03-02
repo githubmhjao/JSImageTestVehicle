@@ -170,8 +170,17 @@ function drawProfile(condition) {
     const channel = 4
     const imageData = [...ctx.getImageData(XS, YS, XF-XS, YF-YS).data]
     const channelImageData = imageData.filter((x, i) => i % channel === 0)
-    const verticalChannelImageData = [...Array(selectWidth)].map((x, i) => channelImageData.filter((xc, ic) => ic % selectWidth === i).map((xv, iv) => [xv, iv]))
-
+    
+    // const verticalChannelImageData = [...Array(selectWidth)].map((x, i) => channelImageData.filter((xc, ic) => ic % selectWidth === i).map((xv, iv) => [xv, iv]))
+    
+    let verticalChannelImageData = [...Array(selectWidth)].map(x => [])
+    
+    channelImageData.forEach((x, i) => {
+        const w = i % selectWidth
+        const h = Math.floor(i / selectWidth)
+        verticalChannelImageData[w].push([x, h])
+    })
+    
     const filterCrit = conCrit === 'above'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
 
     const profile = verticalChannelImageData.map(x => x.filter(filterCrit)[0] || x[selectHeight-1])
