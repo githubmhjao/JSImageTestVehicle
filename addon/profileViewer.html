@@ -85,6 +85,8 @@ myCanv.addEventListener('mousemove', function(event) {
     pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
 })
 
+document.addEventListener('DOMContentLoaded', clearField);
+
 eleXS.onchange = handleChange
 
 eleYS.onchange = handleChange
@@ -264,6 +266,16 @@ function pick(event, colorCol, valueCol) {
     valueCol.textContent = `RGB=(${data[0]}, ${data[1]}, ${data[2]}), x=${x}, y=${y}`
 
     return rgba
+}
+
+function clearField() {
+    myFile.value = ''
+    eleXS.value = ''
+    eleYS.value = ''
+    eleXF.value = ''
+    eleYF.value = ''
+    eleTshd.value = ''
+    eleCrit.value = 'below'
 }
 
 </script>
