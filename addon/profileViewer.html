@@ -2,6 +2,9 @@
 <input type="file" id="myFile">
 <table>
     <tr>
+        <th><h4>Profile Parameters</h4></th>
+    </tr>
+    <tr>
         <th>X Start</th>
         <th><input id="eleXStart"></th>
         <th>Y Start</th>
@@ -21,6 +24,28 @@
             <option value="below">Below</option>
             <option value="above">Above</option>
         </select></th>
+    </tr>
+    <tr>
+        <th><h4>Stroke Parameters</h4></th>
+    </tr>
+    <tr>
+        <th>Color</th>
+        <th><select id="eleColor">
+            <option value="(255,0,0,1)">Red</option>
+            <option value="(255,128,0,1)">Orange</option>
+            <option value="(255,255,0,1)">Yellow</option>
+            <option value="(0,255,0,1)">Green</option>
+            <option value="(0,0,255,1)">Blue</option>
+        </select></th>
+        <th>Stroke</th>
+        <th><select id="eleStroke">
+            <option value="[]">Solid</option>
+            <option value="[5,5]">Dotted</option>
+            <option value="[15,5]">Dashed</option>
+        </select></th>
+    </tr>
+    <tr>
+        <th><h4>Get Files</h4></th>
     </tr>
     <tr>
         <th><button id="myPNG" type="button">PNG File</button></th>
@@ -61,6 +86,9 @@ const eleYF = document.getElementById("eleYFinish")
 const eleTshd = document.getElementById("eleThreshold")
 const eleCrit = document.getElementById("eleCriteria")
 
+const eleColo = document.getElementById("eleColor")
+const eleStro = document.getElementById("eleStroke")
+
 myFile.onchange = async () => { const url = await getOriginalImage() }
 
 myPNG.onclick = async () => {
@@ -98,6 +126,9 @@ eleYF.onchange = handleChange
 eleTshd.onchange = handleChange
 
 eleCrit.onchange = handleChange
+
+eleColo.onchange = handleChange
+eleStro.onchange = handleChange
 
 // get original imageData
 function getOriginalImage() {
@@ -190,6 +221,8 @@ function drawProfile(condition) {
     // begin drawing
     ctx.beginPath()
 
+    ctx.setLineDash(JSON.parse(eleStro.value))
+
     profile.forEach((x, i) => {
         if (i === 0) {
             ctx.moveTo(XS + i, YS + x[1])
@@ -198,7 +231,7 @@ function drawProfile(condition) {
         }
     })
 
-    ctx.strokeStyle = "rgba(0,255,0,1)"
+    ctx.strokeStyle = `rgba${eleColo.value}`
     ctx.lineWidth = 4
     ctx.stroke()
 
@@ -214,6 +247,7 @@ function drawArea(condition) {
     const YF = condition.conYF
 
     ctx.strokeStyle = "red"
+    ctx.setLineDash([15, 5])
     ctx.strokeRect(XS, YS, XF-XS, YF-YS)
 
 }
@@ -275,7 +309,10 @@ function clearField() {
     eleXF.value = ''
     eleYF.value = ''
     eleTshd.value = ''
-    eleCrit.value = 'below'
+    eleCrit[0].selected = true
+
+    eleColo[3].selected = true
+    eleStro[0].selected = true
 }
 
 </script>
