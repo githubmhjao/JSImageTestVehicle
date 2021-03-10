@@ -206,25 +206,25 @@ function drawContour(condition) {
     const channel = 4
     const imageData = [...ctx.getImageData(XS, YS, XF-XS, YF-YS).data]
     const channelImageData = imageData.filter((x, i) => i % channel === 0)
-    
-    // const verticalChannelImageData = [...Array(selectWidth)].map((x, i) => channelImageData.filter((xc, ic) => ic % selectWidth === i).map((xv, iv) => [xv, iv]))
-    
+
+    // outerContour    
     let verticalChannelImageData = [...Array(selectWidth)].map(x => [])
     
     channelImageData.forEach((x, i) => {
         const w = i % selectWidth
         const h = Math.floor(i / selectWidth)
-        verticalChannelImageData[w].push([x, h])
+        verticalChannelImageData[w].push([x > conTshd, h])
     })
     
-    const filterCrit = conCrit === 'above'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
-    const contour = verticalChannelImageData.map(x => x.filter(filterCrit)[0] || x[selectHeight-1])
+    // const filterCrit = conCrit === 'above'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
+    filterCrit = conCrit === 'above'
+    const contour = verticalChannelImageData.map(x => x.filter(x => x[0] === filterCrit)[0] || x[selectHeight-1])
 
 
     // innerContour
-    const innerFilterCrit = conCrit === 'below'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
+    // const innerFilterCrit = conCrit === 'below'? (x) => x[0] > conTshd: (x) => x[0] < conTshd
     verticalChannelImageData = verticalChannelImageData.map((x, i) => x.slice(contour[i][1]))
-    const innerContour = verticalChannelImageData.map(x => x.filter(innerFilterCrit)[0] || x[x.length-1])
+    const innerContour = verticalChannelImageData.map(x => x.filter(x => x[0] === !filterCrit)[0] || x[x.length-1])
 
     // begin drawing
     ctx.beginPath()
