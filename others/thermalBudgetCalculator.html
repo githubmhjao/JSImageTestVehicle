@@ -103,11 +103,7 @@ function handleClick() {
 }
 
 function handleDelete() {
-  // console.log(window.event)
-  const target = window.event.target.parentElement.parentElement
-  
-  // console.log([...eleResu.childNodes].indexOf(target))
-  const index = [...eleResu.childNodes].indexOf(target)
+  const { index } = getEventTarget()  
   budgetList.splice(index, 1)
 
   // updatePercentage
@@ -116,15 +112,21 @@ function handleDelete() {
   // updateBudget
   updateBudget()
 }
-  
+
 function handleShift(direction) {
-  const target = window.event.target.parentElement.parentElement
-  const index = [...eleResu.childNodes].indexOf(target)
+  const { index } = getEventTarget()
 
   const [budgetShifted] = budgetList.splice(index, 1)
   budgetList.splice(index + direction, 0, budgetShifted)
 
   updateBudget()
+}
+
+function getEventTarget() {
+  // console.log(window.event)
+  const target = window.event.target.parentElement.parentElement
+  const index = [...eleResu.childNodes].indexOf(target)
+  return { target, index }
 }
 
 function updatePercentage() {
