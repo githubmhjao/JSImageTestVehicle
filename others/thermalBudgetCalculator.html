@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<div style="background-color: #eeeeee; padding: 10px; margin-bottom: 25px">
+<h3>Reaction Condition</h3>
+<table>
+  <tbody>
+    <tr>
+      <th><label for="eleActivation">Activation Energy</label></th>
+      <th><input id="eleActivation"></th>
+      <th>eV</th>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div style="background-color: #eeeeee; padding: 10px; margin-bottom: 25px">
+<h3>Thermal Budget Condition</h3>
+<table>
+  <tbody>
+    <tr>
+      <th><label for="eleName">Process Name</label></th>
+      <th><input id="eleName"></th>
+    </tr>
+    <tr>
+      <th><label for="eleTemp">Process Temperature</label></th>
+      <th><input id="eleTemp"></th>
+      <th><sup>o</sup>C</th>
+    </tr>
+    <tr>
+      <th><label for="eleTime">Process Time</label></th>
+      <th><input id="eleTime"></th>
+      <th>sec</th>
+    </tr>
+  </tbody>
+</table>
+<button id="eleAdd">Add</button>
+</div>
+
+<div style="background-color: #eeeeee; padding: 10px; margin-bottom: 25px">
+<h3>Thermal Budget Summary</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Temp (<sup>o</sup>C)</th>
+      <th>Time (sec)</th>
+      <th>Percentage (%)</th>
+    </tr>
+  </thead>
+  <tbody id="eleResult"></tbody>
+</table>
+</div>
+
+<script>
+let budgetList = []
+
+const eleActi = document.getElementById("eleActivation")
+const eleName = document.getElementById("eleName")
+const eleTemp = document.getElementById("eleTemp")
+const eleTime = document.getElementById("eleTime")
+const eleResu = document.getElementById("eleResult")
+
+const eleAdd = document.getElementById("eleAdd")
+
+eleActi.onchange = handleChange
+eleAdd.onclick = handleClick
+
+window.onload = () => clearField(true)
+
+function handleChange() {
+  const Ea = Number(eleActi.value)
+  const boltzmann = 8.617E-5
+  // re-calculate
+  budgetList = budgetList.map(x => ({...x, budget: Math.exp(-Ea / boltzmann / x.tempK) * x.time}))
+  
+  // updatePercetage
+  updatePercentage()
+
+  // updateBudget
+  updateBudget()
+}
+
+function handleClick() {
+  // getCurrentBudget
+  const Ea = Number(eleActi.value)
+  const name = eleName.value
+  const tempC = Number(eleTemp.value)
+  const tempK = tempC + 273
+  const time = Number(eleTime.value)
+
+  const boltzmann = 8.617E-5
+  const budget = Math.exp(-Ea / boltzmann / tempK ) * time
+  
+  // storeCurrentBudget
+  budgetList.push({name, tempC, tempK, time, budget})
+
+  // updatePercentage
+  updatePercentage()
+
+  // updateBudget
+  updateBudget()
+
+  clearField(false)
+}
+
+function handleDelete() {
+  // console.log(window.event)
+  const target = window.event.target.parentElement.parentElement
+  
+  // console.log([...eleResu.childNodes].indexOf(target))
+  const index = [...eleResu.childNodes].indexOf(target)
+  budgetList.splice(index, 1)
+
+  // updatePercentage
+  updatePercentage()
+
+  // updateBudget
+  updateBudget()
+}
+  
+function handleShift(direction) {
+  const target = window.event.target.parentElement.parentElement
+  const index = [...eleResu.childNodes].indexOf(target)
+
+  const [budgetShifted] = budgetList.splice(index, 1)
+  budgetList.splice(index + direction, 0, budgetShifted)
+
+  updateBudget()
+}
+
+function updatePercentage() {
+  const totalBudget = budgetList.reduce((a, x) => a+x.budget, 0)
+  budgetList = budgetList.map(x => ({...x, percentage: x.budget / totalBudget * 100}))
+  // budgetList = budgetList.map(x => ({...x, percentage: parseInt(x.budget / totalBudget * 100000) / 1000}))
+}
+
+function updateBudget() {
+  const deleteButton = `<th><button onclick="handleDelete()">X</button></th>`
+  const upper = `<th><button onclick="handleShift(-1)">↑</button></th>`
+  const lower = `<th><button onclick="handleShift(1)">↓</button></th>`
+  const newRow = budgetList.map(x => `<tr><th>${x.name}</th><th>${x.tempC}</th><th>${x.time}</th><th>${x.percentage}</th>${upper}${lower}${deleteButton}</tr>`).reduce((a, x) => a+x, "")
+  eleResu.innerHTML = newRow
+}
+
+function clearField(all) {
+  if (all) { eleActi.value = "" }
+  eleName.value = ""
+  eleTemp.value = ""
+  eleTime.value = ""
+}
+
+</script>
