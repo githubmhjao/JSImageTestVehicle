@@ -79,7 +79,22 @@ eleCanvas.addEventListener('mousemove', function(event) {
     pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
 })
 
-// get original imageData
+// get original imageData (new version)
+function getOriginalImage() {
+    return new Promise(resolve => {
+        const files = myFile.files
+        const img = new Image()
+        const url = URL.createObjectURL(files[0])
+        img.src = url
+        img.onload = function() {
+            imageToCanvas(this)
+            return resolve(url)
+        }
+    })
+}
+
+// get original imageData (old version)
+/*
 function getOriginalImage() {
     return new Promise(resolve => {
             const files = eleLoad.files
@@ -98,6 +113,7 @@ function getOriginalImage() {
         }
     )
 }
+*/
 
 function imageToCanvas(img) {
     const ctx = eleCanvas.getContext("2d")
