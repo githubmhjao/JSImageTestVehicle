@@ -152,6 +152,14 @@
         pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
     })
 
+    myCanv.addEventListener('click', (event) => {
+        const infoRGB = document.getElementById('hovered-value').textContent.split('(')[1].split(')')[0].split(',')
+        eleThR.value = infoRGB[0].trim()
+        eleThG.value = infoRGB[1].trim()
+        eleThB.value = infoRGB[2].trim()
+        handleChange()
+    })
+
     document.addEventListener('DOMContentLoaded', () => clearField(true));
 
     eleXPS.onchange = handleChange
