@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<input type="file" id="myFile">
+<table>
+    <tr>
+        <th>
+            <h4>Profile Parameters</h4>
+        </th>
+    </tr>
+    <tr>
+        <th>Pixel X<sub>0</sub></th>
+        <th><input id="eleXPStart"></th>
+        <th>as Axis X<sub>0</sub></th>
+        <th><input id="eleXAStart"></th>
+    </tr>
+    <tr>
+        <th>Pixel X<sub>1</sub></th>
+        <th><input id="eleXPFinish"></th>
+        <th>as Axis X<sub>1</sub></th>
+        <th><input id="eleXAFinish"></th>
+    </tr>
+    <tr>
+        <th>Pixel Y<sub>0</sub></th>
+        <th><input id="eleYPStart"></th>
+        <th>as Axis Y<sub>0</sub></th>
+        <th><input id="eleYAStart"></th>
+    </tr>
+    <tr>
+        <th>Pixel Y<sub>1</sub></th>
+        <th><input id="eleYPFinish"></th>
+        <th>as Axis Y<sub>1</sub></th>
+        <th><input id="eleYAFinish"></th>
+    </tr>
+    <tr>
+        <th>Threshold Red</th>
+        <th><input id="eleThresholdRed" placeholder="threshold"></th>
+    </tr>
+    <tr>
+        <th>Threshold Green</th>
+        <th><input id="eleThresholdGreen" placeholder="threshold"></th>
+    </tr>
+    <tr>
+        <th>Threshold Blue</th>
+        <th><input id="eleThresholdBlue" placeholder="threshold"></th>
+    </tr>
+    <tr>
+        <th>Criteria</th>
+        <th><select id="eleCriteria">
+                <option value="below">Below</option>
+                <option value="equal">Equal</option>
+                <option value="above">Above</option>
+            </select></th>
+    </tr>
+    <tr>
+        <th>
+            <h4>Stroke Parameters</h4>
+        </th>
+    </tr>
+    <tr>
+        <th>Color</th>
+        <th><select id="eleColor">
+                <option value="(255,0,0,1)">Red</option>
+                <option value="(255,128,0,1)">Orange</option>
+                <option value="(255,255,0,1)">Yellow</option>
+                <option value="(0,255,0,1)">Green</option>
+                <option value="(0,0,255,1)">Blue</option>
+            </select></th>
+        <th>Stroke</th>
+        <th><select id="eleStroke">
+                <option value="[]">Solid</option>
+                <option value="[5,5]">Dotted</option>
+                <option value="[15,5]">Dashed</option>
+            </select></th>
+    </tr>
+    <tr>
+        <th>
+            <h4>Get Files</h4>
+        </th>
+    </tr>
+    <tr>
+        <th><button id="myPNG" type="button">PNG File</button></th>
+        <th><button id="myCSV" type="button">CSV File</button></th>
+    </tr>
+</table>
+<table>
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th width="150">Hovered color</th>
+            <th width="150">Hovered value</th>
+            <th width="150">Selected area</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <canvas id="myCanvas"></canvas>
+            </td>
+            <td align="center" class="color-cell" id="hovered-color"></td>
+            <td align="center" class="color-cell" id="hovered-value"></td>
+            <td align="center" class="color-cell" id="selected-area"></td>
+        </tr>
+    </tbody>
+</table>
+
+<script>
+    const myFile = document.getElementById("myFile")
+    const myCanv = document.getElementById("myCanvas")
+    const myPNG = document.getElementById("myPNG")
+    const myCSV = document.getElementById("myCSV")
+
+    const eleXPS = document.getElementById("eleXPStart")
+    const eleXAS = document.getElementById("eleXAStart")
+    const eleXPF = document.getElementById("eleXPFinish")
+    const eleXAF = document.getElementById("eleXAFinish")
+    const eleYPS = document.getElementById("eleYPStart")
+    const eleYAS = document.getElementById("eleYAStart")
+    const eleYPF = document.getElementById("eleYPFinish")
+    const eleYAF = document.getElementById("eleYAFinish")
+
+    const eleThR = document.getElementById("eleThresholdRed")
+    const eleThG = document.getElementById("eleThresholdGreen")
+    const eleThB = document.getElementById("eleThresholdBlue")
+    const eleCrit = document.getElementById("eleCriteria")
+
+    const eleColo = document.getElementById("eleColor")
+    const eleStro = document.getElementById("eleStroke")
+
+    myFile.onchange = async () => {
+        const url = await getOriginalImage()
+        clearField()
+    }
+
+    myPNG.onclick = async () => {
+        const url = await getOriginalImage()
+        const condition = queryCondition()
+        const profile = drawProfile(condition)
+        const filename = myFile.files[0].name
+        downloadPNG(filename, condition)
+        drawArea(condition)
+    }
+
+    myCSV.onclick = async () => {
+        const url = await getOriginalImage()
+        const condition = queryCondition()
+        const profile = drawProfile(condition)
+        const filename = myFile.files[0].name
+        downloadCSV(filename, condition, profile)
+        drawArea(condition)
+    }
+
+    myCanv.addEventListener('mousemove', function (event) {
+        pick(event, document.getElementById('hovered-color'), document.getElementById('hovered-value'));
+    })
+
+    document.addEventListener('DOMContentLoaded', () => clearField(true));
+
+    eleXPS.onchange = handleChange
+    eleXAS.onchange = handleChange
+    eleYPS.onchange = handleChange
+    eleYAS.onchange = handleChange
+    eleXPF.onchange = handleChange
+    eleXAF.onchange = handleChange
+    eleYPF.onchange = handleChange
+    eleYAF.onchange = handleChange
+
+    eleThR.onchange = handleChange
+    eleThG.onchange = handleChange
+    eleThB.onchange = handleChange
+    eleCrit.onchange = handleChange
+
+    eleColo.onchange = handleChange
+    eleStro.onchange = handleChange
+
+    // get original imageData
+    function getOriginalImage() {
+        return new Promise(resolve => {
+            const files = myFile.files
+            if (FileReader && files && files.length) {
+                const fr = new FileReader()
+                fr.readAsDataURL(files[0])
+                fr.onload = function (evt) {
+                    const img = new Image()
+                    img.src = evt.target.result
+                    img.onload = function () {
+                        imageToCanvas(this)
+                        return resolve(evt.target.result)
+                    }
+                }
+            }
+        }
+        )
+    }
+
+    function imageToCanvas(img) {
+        const ctx = myCanv.getContext("2d")
+        myCanv.width = img.width
+        myCanv.height = img.height
+        ctx.drawImage(img, 0, 0)
+    }
+
+    // query condition
+    function queryCondition() {
+        const XPS = Number(eleXPS.value || 0)
+        const XAS = Number(eleXAS.value || 0)
+        const XPF = Number(eleXPF.value || myCanv.width)
+        const XAF = Number(eleXAF.value || 100)
+
+        const YPS = Number(eleYPS.value || 0)
+        const YAS = Number(eleYAS.value || 0)
+        const YPF = Number(eleYPF.value || myCanv.height)
+        const YAF = Number(eleYAF.value || 100)
+
+        const ThR = Number(eleThR.value || 0)
+        const ThG = Number(eleThG.value || 0)
+        const ThB = Number(eleThB.value || 0)
+        const Crit = eleCrit.value
+
+        return { XPS, XAS, XPF, XAF, YPS, YAS, YPF, YAF, ThR, ThG, ThB, Crit }
+    }
+
+    function drawProfile(condition) {
+
+        const ctx = myCanv.getContext("2d")
+        const XPS = condition.XPS
+        const YPS = condition.YPS
+        const XPF = condition.XPF
+        const YPF = condition.YPF
+
+        const conThR = condition.ThR
+        const conThG = condition.ThG
+        const conThB = condition.ThB
+
+        const conCrit = condition.Crit
+
+        const selectWidth = XPF - XPS
+        const selectHeight = YPF - YPS
+        const channel = 4
+        const imageData = [...ctx.getImageData(XPS, YPS, XPF - XPS, YPF - YPS).data]
+
+        let profile
+
+        function convertVerticalChannel(emptyVerticalData) {
+            return (x, i) => {
+                const w = i % selectWidth
+                const h = Math.floor(i / selectWidth)
+                emptyVerticalData[w].push([x, h])
+            }
+        }
+
+        function filterVerticalChannel(criteria, temp) {
+            return (x) => {
+                if (x.filter(criteria)[0]) {
+                    temp = x.filter(criteria)[0]
+                    return temp
+                } else {
+                    return temp || x[selectHeight - 1]
+                }
+            }
+        }
+
+        if (conCrit !== 'equal') {
+            const channelImageData = imageData.filter((x, i) => i % channel === 0)
+
+            // const verticalChannelImageData = [...Array(selectWidth)].map((x, i) => channelImageData.filter((xc, ic) => ic % selectWidth === i).map((xv, iv) => [xv, iv]))           
+            let verticalChannelImageData = [...Array(selectWidth)].map(x => [])
+
+            channelImageData.forEach(convertVerticalChannel(verticalChannelImageData))
+            // channelImageData.forEach((x, i) => {
+            //     const w = i % selectWidth
+            //     const h = Math.floor(i / selectWidth)
+            //     verticalChannelImageData[w].push([x, h])
+            // })
+
+            const filterCrit = conCrit === 'above' ? (x) => x[0] > conThR : (x) => x[0] < conThR
+
+            let tempValue
+            profile = verticalChannelImageData.map(filterVerticalChannel(filterCrit, tempValue)).map(x => x[1])
+
+        } else {
+
+            const rImageData = imageData.filter((x, i) => i % channel === 0)
+            const gImageData = imageData.filter((x, i) => i % channel === 1)
+            const bImageData = imageData.filter((x, i) => i % channel === 2)
+
+            let verticalRImageData = [...Array(selectWidth)].map(x => [])
+            let verticalGImageData = [...Array(selectWidth)].map(x => [])
+            let verticalBImageData = [...Array(selectWidth)].map(x => [])
+
+            rImageData.forEach(convertVerticalChannel(verticalRImageData))
+            gImageData.forEach(convertVerticalChannel(verticalGImageData))
+            bImageData.forEach(convertVerticalChannel(verticalBImageData))
+
+            const verticalRGBImageData = verticalRImageData.map((x, w) => {
+                return x.map((y, h) => {
+                    return [y[0], verticalGImageData[w][h][0], verticalBImageData[w][h][0], y[1]]
+                })
+            })
+
+            let tempValue
+            const filterCrit = (x) => x.slice(0, 3).toString() === `${conThR},${conThG},${conThB}`
+            profile = verticalRGBImageData.map(filterVerticalChannel(filterCrit, tempValue)).map(x => x[3])
+
+        }
+
+        // begin drawing
+        ctx.beginPath()
+
+        ctx.setLineDash(JSON.parse(eleStro.value))
+
+        profile.forEach((x, i) => {
+            if (i === 0) {
+                ctx.moveTo(XPS + i, YPS + x)
+            } else {
+                ctx.lineTo(XPS + i, YPS + x)
+            }
+        })
+
+        ctx.strokeStyle = `rgba${eleColo.value}`
+        ctx.lineWidth = 4
+        ctx.stroke()
+
+        return profile
+    }
+
+    function drawArea(condition) {
+
+        const ctx = myCanv.getContext("2d")
+        const XPS = condition.XPS
+        const YPS = condition.YPS
+        const XPF = condition.XPF
+        const YPF = condition.YPF
+
+        ctx.strokeStyle = "red"
+        ctx.setLineDash([15, 5])
+        ctx.strokeRect(XPS, YPS, XPF - XPS, YPF - YPS)
+
+    }
+
+    async function handleChange() {
+        const url = await getOriginalImage()
+        const condition = queryCondition()
+        drawProfile(condition)
+        drawArea(condition)
+    }
+
+    function downloadCSV(fn, condition, profile) {
+
+        const XS = condition.XPS
+        const YS = condition.YPS
+        const height = myCanv.height
+        const adjustProfile = profile.map((x, i) => [XS + i, height - YS - x])
+        const csvContent = "data:text/csv;charset=utf-8," + adjustProfile.map(x => x.join(",")).join("\n")
+        const encodedUri = encodeURI(csvContent)
+
+        const link = document.createElement("a")
+        link.setAttribute("href", encodedUri)
+        link.setAttribute("download", `${fn}_[${condition.XPS}_${condition.YPS}_${condition.XPF}_${condition.YPF}].csv`)
+
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+
+        link.click()
+    }
+
+    function downloadPNG(fn, condition) {
+        const link = document.createElement("a")
+        link.setAttribute("href", myCanv.toDataURL())
+        link.setAttribute("download", `${fn}_[${condition.XPS}_${condition.YPS}_${condition.XPF}_${condition.YPF}].png`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+
+        link.click()
+    }
+
+    function pick(event, colorCol, valueCol) {
+        const ctx = myCanv.getContext("2d")
+        const x = event.offsetX
+        const y = event.offsetY
+        const pixel = ctx.getImageData(x, y, 1, 1)
+        const data = pixel.data
+
+        const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
+        colorCol.style.background = rgba
+        valueCol.textContent = `RGB=(${data[0]}, ${data[1]}, ${data[2]}), x=${x}, y=${y}`
+
+        return rgba
+    }
+
+    function clearField(all = false) {
+        if (all) myFile.value = ''
+        eleXPS.value = ''
+        eleXAS.value = ''
+        eleXPF.value = ''
+        eleXAF.value = ''
+
+        eleYPS.value = ''
+        eleYAS.value = ''
+        eleYPF.value = ''
+        eleYAF.value = ''
+        eleThR.value = ''
+        eleThG.value = ''
+        eleThB.value = ''
+        eleCrit[0].selected = true
+
+        eleColo[3].selected = true
+        eleStro[0].selected = true
+    }
+
+</script>
