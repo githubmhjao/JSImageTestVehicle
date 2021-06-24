@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    .layer { background-color: #aaaaaa; }
+    .layer-active { 
+      background-color: #ffffff; 
+      border-left: 5px solid green;
+    }
+  </style>
+</head>
+
+<body>
+  <label for="eleLoad">Load image</label>
+  <input type="file" id="eleLoad">
+  <table>
+    <tbody>
+      <tr>
+        <td>Pointer X</td>
+        <td><input id="pointerX" readonly></td>
+      </tr>
+      <tr>
+        <td>Pointer Y</td>
+        <td><input id="pointerY" readonly></td>
+      </tr>
+      <tr>
+        <td>Color R</td>
+        <td><input id="colorR" readonly></td>
+      </tr>
+      <tr>
+        <td>Color G</td>
+        <td><input id="colorG" readonly></td>
+      </tr>
+      <tr>
+        <td>Color B</td>
+        <td><input id="colorB" readonly></td>
+      </tr>
+      <tr>
+        <td>Color</td>
+        <td><input id="colorShow" readonly></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td>
+          <input type="checkbox" id="wOriginImage" name="wOriginImage" value="wOriginImage" onchange="render()" Checked>
+          <label for="wOriginImage">with origin image</label>
+        </td>
+        <td><button id="elePNG" type="button">PNG File</button></td>
+        <td><button id="eleCSV" type="button">CSV File</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <table>
+    <thead>
+      <tr>
+        <th>Image</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <canvas id="eleCanvas"></canvas>
+        </td>
+      </tr>
+      <tr><td>Active Layer: <input id="eleActiveLayerIndex" readonly></td></tr>
+      <tr><td><button onclick="addLayer()">+</button></td></tr>
+    </tbody>
+  </table>
+  <div id="layers"></div>
+
+
+<script>
+const eleLoad = document.getElementById("eleLoad")
+const eleActiveLayerIndex = document.getElementById("eleActiveLayerIndex")
+const elePNG = document.getElementById("elePNG")
+const eleCSV = document.getElementById("eleCSV")
+const eleCanvas = document.getElementById("eleCanvas")
+
+window.onload = () => clearField(true)
+
+eleLoad.onchange = async () => { 
+    await render() 
+    clearField(false)
+}
+
+elePNG.onclick = downloadPNG
+eleCSV.onclick = downloadCSV
+
+eleCanvas.addEventListener('mousemove', function(event) {
+    pick(event, "pointerX", "pointerY", "colorR", "colorG", "colorB", "colorShow");
+})
+
+eleCanvas.addEventListener("click", (event) => {
+  const layerIndex = eleActiveLayerIndex.value
+  if (layerIndex) handleClick(event)
+})
+
+// get original imageData (new version)
+function getOriginalImage() {
+  return new Promise(resolve => {
+    const files = eleLoad.files
+    const img = new Image()
+    const url = URL.createObjectURL(files[0])
+    img.src = url
+    img.onload = function() {
+      imageToCanvas(this)
+      return resolve(url)
+    }
+  })
+}
+
+function imageToCanvas(img) {
+  const ctx = eleCanvas.getContext("2d")
+  eleCanvas.width = img.width
+  eleCanvas.height = img.height
+  ctx.drawImage(img, 0, 0)
+}
+
+function addLayer() {
+  const layersDiv = document.getElementById("layers")
+  const index = layersDiv.childElementCount
+  const colors = ["maroon", "red", "orange", "yellow", "lawngreen", "green", "dodgerblue", "blue", "indigo", "black", "silver", "white"]
+  const colorOptions = colors.map(x => `<option value="${x}">${x}</option>`)
+  const DOMString = `
+    <table id=layerIndex${index} class="layer">
+      <thead>
+        <tr>
+          <th onclick="toggleActiveLayer(event)">Layer ${index}</th>
+          <th><select id="layerIndex${index}-drawType" onchange="render()"><option value="line">line</option><option value="area">area</option></select></th>
+          <th></th>
+          <th>
+            <select id="layerIndex${index}-drawColor" onchange="render()">
+              ${colorOptions}
+            </select>
+          </th>
+          <th></th>
+          <th><button onclick="toggleHidden(event)">Hidden/Show</button></th>
+        </tr>
+      </thead>
+      <tbody id="layerIndex${index}-register">
+      </tbody>
+    </table>
+  `
+  layersDiv.insertAdjacentHTML('beforeend', DOMString)
+  setActiveLayer(index)
+}
+
+function setActiveLayer(index) {
+  // remove class
+  const oldIndex = eleActiveLayerIndex.value
+  if (oldIndex) {
+    const oldActiveLayer = document.getElementById(`layerIndex${oldIndex}`)
+    oldActiveLayer.classList.remove("layer-active")
+  }
+
+  // add class
+  eleActiveLayerIndex.value= index
+  const activeLayer = document.getElementById(`layerIndex${index}`)
+  activeLayer.classList.add("layer-active")
+}
+
+function toggleActiveLayer(e) {
+  const index = e.target.parentElement.parentElement.parentElement.id.slice("layerIndex".length)
+//  console.log(e.target.parentElement.parentElement.parentElement.id)
+  setActiveLayer(index)
+}
+
+// on click
+async function handleClick(event) {
+    registerPoint(event)
+    await render()
+}
+
+function registerPoint(event) {
+//  console.log(event)
+  const layerIndex = eleActiveLayerIndex.value
+  const register = document.getElementById(`layerIndex${layerIndex}-register`)
+  const x = document.getElementById("pointerX").value
+  const y = document.getElementById("pointerY").value
+  const index = register.childElementCount
+
+  const DOMString = `
+    <tr>
+      <td>index</td>
+      <td><input value=${index} readonly></td>
+      <td>X</td>
+      <td><input value=${x} readonly></td>
+      <td>Y</td>
+      <td><input value=${y} readonly></td>
+      <td><button onclick="handlePointDelete(event)">Del.</button></td>
+    </tr>
+  `
+  register.insertAdjacentHTML('beforeend', DOMString);
+}
+
+function registerDraw(layerIndex) {
+  const drawType = document.getElementById(`layerIndex${layerIndex}-drawType`).value
+  const drawColor = document.getElementById(`layerIndex${layerIndex}-drawColor`).value
+  const register = document.getElementById(`layerIndex${layerIndex}-register`)
+  const registerChildren = [...register.children]
+
+  const ctx = eleCanvas.getContext("2d")
+  ctx.beginPath()
+  registerChildren.forEach((child, i) => {
+    if (i === 0) {
+      const x = child.children[3].children[0].value
+      const y = child.children[5].children[0].value
+      ctx.moveTo(x, y)
+    } else {
+      const x = child.children[3].children[0].value
+      const y = child.children[5].children[0].value
+      ctx.lineTo(x, y)
+    }
+  })
+
+  if (drawType === "line") {
+    ctx.strokeStyle = drawColor
+    ctx.stroke()
+  } else if (drawType === "area") {
+    ctx.closePath()
+    ctx.stroke()
+    ctx.fillStyle = drawColor
+    ctx.fill()
+  }
+}
+
+async function render() {
+  if (eleLoad.files.length) {
+    const url = await getOriginalImage()
+  }
+  const wOriginImage = document.getElementById("wOriginImage")
+  if (!wOriginImage.checked) {
+    const ctx = eleCanvas.getContext("2d")
+    const width = eleCanvas.width
+    const height = eleCanvas.height
+    ctx.clearRect(0, 0, width, height)
+  }
+  const layerIndexes = [...document.querySelectorAll(".layer")].map(x => x.id.slice("layerIndex".length))
+  layerIndexes.forEach(x => registerDraw(x))
+}
+
+function toggleHidden(e) {
+  const index = e.target.parentElement.parentElement.parentElement.parentElement.id.slice("layerIndex".length)
+  const register = document.getElementById(`layerIndex${index}-register`)
+  register.style.display = register.getAttribute("style") ? "" : "none"
+}
+
+async function downloadPNG() {
+    await render()
+    const filename = eleLoad.files[0].name
+    const link = document.createElement("a")
+    link.setAttribute("href", eleCanvas.toDataURL())
+    link.setAttribute("download", `${filename}_layerPaint.png`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+}
+
+// Not yet implement
+async function downloadCSV() {
+
+//  const csvContent = "data:text/csv;charset=utf-8," + tgtImageData.map(x => x.join(",")).join("\n")
+    const filename = eleLoad.files[0].name
+    let encodedUri = encodeURI(csvContent);
+    let link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", filename + ".csv")
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+
+    link.click()
+}
+
+function pick(event, pointerX, pointerY, colorR, colorG, colorB, colorShow) {
+  const ctx = eleCanvas.getContext("2d")
+  const pX = document.getElementById(pointerX)
+  const pY = document.getElementById(pointerY)
+  const cR = document.getElementById(colorR)
+  const cG = document.getElementById(colorG)
+  const cB = document.getElementById(colorB)
+  const c = document.getElementById(colorShow)
+
+  const x = event.offsetX
+  const y = event.offsetY
+  const pixel = ctx.getImageData(x, y, 1, 1)
+  const data = pixel.data
+
+  const rgba = `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`
+  c.style.background = rgba
+  pX.value = x
+  pY.value = y
+  cR.value = data[0]
+  cG.value = data[1]
+  cB.value = data[2]
+
+  return rgba
+}
+
+async function handlePointDelete(e) {
+  const tbody = e.target.parentElement.parentElement.parentElement
+  const tr = e.target.parentElement.parentElement
+  tbody.removeChild(tr)
+  const trArray = [...tbody.querySelectorAll("tr")]
+  trArray.forEach((x, i) => {
+    x.querySelector("input").value = i
+  })
+
+  await render()
+}
+
+function clearField(all) {
+  if (all) { eleLoad.value = '' }
+  const valueFields = ["pointerX", "pointerY", "colorR", "colorG", "colorB", "colorShow", "eleActiveLayerIndex"]
+  valueFields.forEach(x => {
+    document.getElementById(x).value = ""
+  })
+}
+</script>
+
+</body>
+
+</html>
